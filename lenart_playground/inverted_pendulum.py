@@ -18,7 +18,7 @@ train_fn = {
     'inverted_pendulum': functools.partial(sac.train, num_timesteps=300_000, num_evals=20, reward_scaling=10,
                                            episode_length=1000, normalize_observations=True, action_repeat=1,
                                            discounting=0.97, learning_rate=3e-4, num_envs=64, batch_size=64,
-                                           grad_updates_per_step=32, max_devices_per_host=1, max_replay_size=2 ** 14,
+                                           grad_updates_per_step=32, max_replay_size=2 ** 14,
                                            min_replay_size=2 ** 9, seed=1, num_eval_envs=32)
 }[env_name]
 
