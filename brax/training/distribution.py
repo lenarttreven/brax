@@ -94,19 +94,6 @@ class ParametricDistribution(abc.ABC):
         return entropy
 
 
-class TanhBijector:
-    """Tanh Bijector."""
-
-    def forward(self, x):
-        return jnp.tanh(x)
-
-    def inverse(self, y):
-        return jnp.arctanh(y)
-
-    def forward_log_det_jacobian(self, x):
-        return 2. * (jnp.log(2.) - x - jax.nn.softplus(-2. * x))
-
-
 class NormalTanhDistribution(ParametricDistribution):
     """Normal distribution followed by tanh."""
 
@@ -126,7 +113,7 @@ class NormalTanhDistribution(ParametricDistribution):
         # jacobian into account in log_prob computations.
         super().__init__(
             param_size=2 * event_size,
-            postprocessor=TanhBijector(),
+            postprocessor=distrax.Tanh(),
             event_ndims=1,
             reparametrizable=True)
         self._min_std = min_std
