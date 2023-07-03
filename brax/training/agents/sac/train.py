@@ -202,8 +202,8 @@ def train(environment: envs.Env,
     dummy_transition = Transition(
         observation=dummy_obs,
         action=dummy_action,
-        reward=0.,
-        discount=0.,
+        reward=jnp.array(0.),
+        discount=jnp.array(0.),
         next_observation=dummy_obs,
         extras={'state_extras': {'truncation': 0.}, 'policy_extras': {}})
     replay_buffer = replay_buffers.UniformSamplingQueue(
