@@ -122,3 +122,4 @@ class NormalTanhDistribution(ParametricDistribution):
         loc, scale = jnp.split(parameters, 2, axis=-1)
         scale = jax.nn.softplus(scale) + self._min_std
         return vmap(distrax.Normal)(loc, scale)
+    # note that distrax.MultivariateNormalDiag(loc, scale) doesn't work here! Need to apply vmap
