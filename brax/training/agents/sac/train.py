@@ -19,9 +19,10 @@ See: https://arxiv.org/pdf/1812.05905.pdf
 
 import functools
 import time
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Optional, Tuple
 
 import flax
+import flax.linen as nn
 import jax
 import jax.numpy as jnp
 import optax
@@ -38,7 +39,6 @@ from brax.training.agents.sac import losses as sac_losses
 from brax.training.agents.sac import networks as sac_networks
 from brax.training.types import PRNGKey
 from brax.training.types import Params
-from brax.v1 import envs as envs_v1
 
 Metrics = types.Metrics
 Transition = types.Transition
@@ -97,8 +97,8 @@ def _init_training_state(
     return training_state
 
 
-def train(environment: Union[envs_v1.Env, envs.Env],
-          num_timesteps,
+def train(environment: envs.Env,
+          num_timesteps: int,
           episode_length: int,
           action_repeat: int = 1,
           num_envs: int = 1,
@@ -118,9 +118,35 @@ def train(environment: Union[envs_v1.Env, envs.Env],
           network_factory: types.NetworkFactory[
               sac_networks.SACNetworks] = sac_networks.make_sac_networks,
           progress_fn: Callable[[int, Metrics], None] = lambda *args: None,
-          checkpoint_logdir: Optional[str] = None,
           eval_env: Optional[envs.Env] = None):
-    """SAC training."""
+    """
+
+    Args:
+        environment:
+        num_timesteps:
+        episode_length:
+        action_repeat:
+        num_envs:
+        num_eval_envs:
+        learning_rate:
+        discounting:
+        seed:
+        batch_size:
+        num_evals: Number of times during training we evaluate the policy performance (one at the beginning and the rest in the middle).
+        normalize_observations:
+        reward_scaling: how much to scale the reward by.
+        tau: soft update coefficient for the target network.
+        min_replay_size: minimum replay size before learning begins.
+        max_replay_size: maximum replay size.
+        grad_updates_per_step: number of gradient updates per step.
+        deterministic_eval: whether to use a deterministic policy for evaluation.
+        network_factory: creates critics and actor networks.
+        progress_fn:
+        eval_env:
+
+    Returns:
+
+    """
     if min_replay_size >= num_timesteps:
         raise ValueError(
             'No training will happen because min_replay_size >= num_timesteps')
@@ -139,16 +165,16 @@ def train(environment: Union[envs_v1.Env, envs.Env],
     # equals to
     # ceil(num_timesteps - num_prefill_env_steps /
     #      (num_evals_after_init * env_steps_per_actor_step))
+    # num_training_steps_per_epoch is how many action we apply in every epoch
     num_training_steps_per_epoch = -(
             -(num_timesteps - num_prefill_env_steps) //
             (num_evals_after_init * env_steps_per_actor_step))
 
     env = environment
-    if isinstance(env, envs.Env):
-        wrap_for_training = envs.training.wrap
-    else:
-        wrap_for_training = envs_v1.wrappers.wrap_for_training
+    assert isinstance(env, envs.Env)
 
+    # Add Episode, Vmap and Autoreset wrappers.
+    wrap_for_training = envs.training.wrap
     env = wrap_for_training(
         env, episode_length=episode_length, action_repeat=action_repeat)
 
@@ -161,17 +187,19 @@ def train(environment: Union[envs_v1.Env, envs.Env],
     sac_network = network_factory(
         observation_size=obs_size,
         action_size=action_size,
-        preprocess_observations_fn=normalize_fn)
+        preprocess_observations_fn=normalize_fn,
+        activation=nn.softplus,
+        hidden_layer_sizes=(64, 64, 64), )
+    # Make policy is a function that takes params and boolean and either applies the policy or samples from it
     make_policy = sac_networks.make_inference_fn(sac_network)
 
     alpha_optimizer = optax.adam(learning_rate=3e-4)
-
     policy_optimizer = optax.adam(learning_rate=learning_rate)
     q_optimizer = optax.adam(learning_rate=learning_rate)
 
     dummy_obs = jnp.zeros((obs_size,))
     dummy_action = jnp.zeros((action_size,))
-    dummy_transition = Transition(  # pytype: disable=wrong-arg-types  # jax-ndarray
+    dummy_transition = Transition(
         observation=dummy_obs,
         action=dummy_action,
         reward=0.,
@@ -195,6 +223,7 @@ def train(environment: Union[envs_v1.Env, envs.Env],
     actor_update = gradients.gradient_update_fn(  # pytype: disable=wrong-arg-types  # jax-ndarray
         actor_loss, policy_optimizer, pmap_axis_name=_PMAP_AXIS_NAME)
 
+    @jax.jit
     def sgd_step(
             carry: Tuple[TrainingState, PRNGKey],
             transitions: Transition) -> Tuple[Tuple[TrainingState, PRNGKey], Metrics]:
@@ -254,10 +283,9 @@ def train(environment: Union[envs_v1.Env, envs.Env],
 
     def get_experience(
             normalizer_params: running_statistics.RunningStatisticsState,
-            policy_params: Params, env_state: Union[envs.State, envs_v1.State],
+            policy_params: Params, env_state: envs.State,
             buffer_state: ReplayBufferState, key: PRNGKey
-    ) -> Tuple[running_statistics.RunningStatisticsState,
-    Union[envs.State, envs_v1.State], ReplayBufferState]:
+    ) -> Tuple[running_statistics.RunningStatisticsState, envs.State, ReplayBufferState]:
         policy = make_policy((normalizer_params, policy_params))
         env_state, transitions = acting.actor_step(
             env, env_state, policy, key, extra_fields=('truncation',))
@@ -273,7 +301,7 @@ def train(environment: Union[envs_v1.Env, envs.Env],
     def training_step(
             training_state: TrainingState, env_state: envs.State,
             buffer_state: ReplayBufferState, key: PRNGKey
-    ) -> Tuple[TrainingState, Union[envs.State, envs_v1.State], ReplayBufferState, Metrics]:
+    ) -> Tuple[TrainingState, envs.State, ReplayBufferState, Metrics]:
         experience_key, training_key = jax.random.split(key)
         normalizer_params, env_state, buffer_state = get_experience(
             training_state.normalizer_params, training_state.policy_params,
@@ -295,6 +323,7 @@ def train(environment: Union[envs_v1.Env, envs.Env],
         metrics['buffer_current_size'] = replay_buffer.size(buffer_state)
         return training_state, env_state, buffer_state, metrics
 
+    @jax.jit
     def prefill_replay_buffer(
             training_state: TrainingState, env_state: envs.State,
             buffer_state: ReplayBufferState, key: PRNGKey
@@ -435,4 +464,4 @@ def train(environment: Union[envs_v1.Env, envs.Env],
     # If there was no mistakes the training_state should still be identical on all
     # devices.
     logging.info('total steps: %s', total_steps)
-    return (make_policy, params, metrics)
+    return make_policy, params, metrics

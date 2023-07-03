@@ -8,7 +8,7 @@ from brax import envs
 from brax.training.agents.sac import train as sac
 
 env_name = 'inverted_pendulum'
-backend = 'positional'  # @param ['generalized', 'positional', 'spring']
+backend = 'generalized'  # @param ['generalized', 'positional', 'spring']
 
 env = envs.get_environment(env_name=env_name,
                            backend=backend)
@@ -17,9 +17,9 @@ state = jax.jit(env.reset)(rng=jax.random.PRNGKey(seed=0))
 train_fn = {
     'inverted_pendulum': functools.partial(sac.train, num_timesteps=300_000, num_evals=20, reward_scaling=10,
                                            episode_length=1000, normalize_observations=True, action_repeat=1,
-                                           discounting=0.97, learning_rate=3e-4, num_envs=64, batch_size=64,
+                                           discounting=0.97, learning_rate=3e-4, num_envs=128, batch_size=64,
                                            grad_updates_per_step=32, max_replay_size=2 ** 14,
-                                           min_replay_size=2 ** 9, seed=1, num_eval_envs=32)
+                                           min_replay_size=2 ** 9, seed=1, num_eval_envs=32, deterministic_eval=True)
 }[env_name]
 
 max_y = 2000

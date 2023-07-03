@@ -98,6 +98,7 @@ def make_policy_network(
     return policy_module.apply(policy_params, obs)
 
   dummy_obs = jnp.zeros((1, obs_size))
+  # Feed forward neural network is already in the in vectorized form (i.e. it expects multiple observations as input)
   return FeedForwardNetwork(
       init=lambda key: policy_module.init(key, dummy_obs), apply=apply)
 

@@ -153,9 +153,7 @@ class QueueBase(ReplayBuffer[ReplayBufferState, Sample], Generic[Sample]):
         # `update` after the current position.
         position = buffer_state.insert_position
         roll = jnp.minimum(0, len(data) - position - len(update))
-        data = jax.lax.cond(
-            roll, lambda: jnp.roll(data, roll, axis=0), lambda: data
-        )
+        data = jax.lax.cond(roll, lambda: jnp.roll(data, roll, axis=0), lambda: data)
         position = position + roll
 
         # Update the buffer and the control numbers.
@@ -447,10 +445,3 @@ class PjitWrapper(ReplayBuffer[State, Sample]):
     def sample_internal(self, buffer_state: State) -> Tuple[State, Sample]:
         """Sample a batch of data."""
         raise ValueError('This function should not be called.')
-
-
-@flax.struct.dataclass
-class PrimitiveReplayBufferState(Generic[Sample]):
-    """The state of the primitive replay buffer."""
-
-    samples: Optional[Sample] = None
