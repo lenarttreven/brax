@@ -30,7 +30,7 @@ except ImportError:
 
 Params = Any
 PRNGKey = jnp.ndarray
-Metrics = Mapping[str, jnp.ndarray]
+Metrics = dict[str, jnp.ndarray]
 Observation = jnp.ndarray
 Action = jnp.ndarray
 Extra = Mapping[str, Any]
