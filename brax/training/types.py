@@ -16,9 +16,9 @@
 
 from typing import Any, Mapping, NamedTuple, Tuple, TypeVar
 
+import chex
 import jax.numpy as jnp
-
-from brax.training.acme.types import NestedArray
+from jaxtyping import PyTree
 
 # Protocol was introduced into typing in Python >=3.8
 # via https://www.python.org/dev/peps/pep-0544/
@@ -42,12 +42,12 @@ NetworkType = TypeVar('NetworkType')
 
 class Transition(NamedTuple):
     """Container for a transition."""
-    observation: NestedArray
-    action: NestedArray
-    reward: NestedArray
-    discount: NestedArray
-    next_observation: NestedArray
-    extras: NestedArray = ()  # pytype: disable=annotation-type-mismatch  # jax-ndarray
+    observation: chex.Array
+    action: chex.Array
+    reward: chex.Array
+    discount: chex.Array
+    next_observation: chex.Array
+    extras: PyTree = ()  # pytype: disable=annotation-type-mismatch  # jax-ndarray
 
 
 class Policy(Protocol):
