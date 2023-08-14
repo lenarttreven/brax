@@ -9,22 +9,20 @@ import matplotlib.pyplot as plt
 from flax import struct
 
 from brax import envs
-from brax.training.agents.sac import train as sac
+from brax.training.agents.ppo import train as ppo
 
 env_name = 'pendulum'
 backend = 'spring'  # @param ['generalized', 'positional', 'spring']
 
-env = envs.get_environment(env_name=env_name,
-                           backend=backend)
+env = envs.get_environment(env_name=env_name, backend=backend)
 state = jax.jit(env.reset)(rng=jax.random.PRNGKey(seed=0))
 
 train_fn = {
-    'pendulum': functools.partial(sac.train, num_timesteps=30_000, num_evals=20, reward_scaling=1,
-                                  episode_length=100, normalize_observations=True, action_repeat=1,
-                                  discounting=0.999, learning_rate=3e-4, num_envs=16, batch_size=64,
-                                  grad_updates_per_step=32, max_replay_size=10 ** 5,
-                                  min_replay_size=2 ** 8, seed=1, num_eval_envs=1, deterministic_eval=True,
-                                  tau=0.005)
+    'pendulum': functools.partial(ppo.train, num_timesteps=200_000, num_evals=20, episode_length=100, reward_scaling=10,
+                                  normalize_observations=True, unroll_length=50, num_minibatches=32,
+                                  action_repeat=1, learning_rate=3e-4, num_envs=16, seed=1, num_eval_envs=1,
+                                  num_updates_per_batch=4, discounting=0.99, entropy_cost=1e-1,
+                                  batch_size=64, deterministic_eval=True)
 }[env_name]
 
 max_y = 0
@@ -38,7 +36,7 @@ def progress(num_steps, metrics):
     times.append(datetime.now())
     xdata.append(num_steps)
     ydata.append(metrics['eval/episode_reward'])
-    plt.xlim([0, train_fn.keywords['num_timesteps']])
+    # plt.xlim([0, train_fn.keywords['num_timesteps']])
     plt.ylim([min_y, max_y])
     plt.xlabel('# environment steps')
     plt.ylabel('reward per episode')
@@ -79,13 +77,6 @@ def next_step(x: chex.Array, params):
     x_next = x_next.at[0].set(convert_angle(x_next[0]))
     return x_next, (4 * u, eta)
 
-
-# def next_step_halucination(x: chex.Array, params):
-#     u_enlarged = policy(x, params, jr.PRNGKey(0))
-#     u, eta = u_enlarged[:1], u_enlarged[1:]
-#     x_next = x + dt * (_ode(x, u) + eta * 0.1)
-#     x_next = x_next.at[0].set(convert_angle(x_next[0]))
-#     return x_next, (4 * u, eta)
 
 
 @struct.dataclass
